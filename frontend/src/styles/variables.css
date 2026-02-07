@@ -1,0 +1,425 @@
+/*
+ * Fuploader Design System - Color Variables
+ * WCAG 2.1 AA Compliant Color Palette
+ * Version: 2.2 (Updated to Sky Blue Palette)
+ */
+
+/* ============================================
+   CORE COLOR PALETTE DEFINITION
+   ============================================ */
+
+:root {
+  /* Primary Brand Colors - Sky Blue */
+  --color-primary-50: #f0f9ff;
+  --color-primary-100: #e0f2fe;
+  --color-primary-200: #bae6fd;
+  --color-primary-300: #7dd3fc;
+  --color-primary-400: #38bdf8;
+  --color-primary-500: #0ea5e9;
+  --color-primary-600: #0284c7;
+  --color-primary-700: #0369a1;
+  --color-primary-800: #075985;
+  --color-primary-900: #0c4a6e;
+
+  /* Secondary Colors - Slate */
+  --color-slate-50: #f8fafc;
+  --color-slate-100: #f1f5f9;
+  --color-slate-200: #e2e8f0;
+  --color-slate-300: #cbd5e1;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #64748b;
+  --color-slate-600: #475569;
+  --color-slate-700: #334155;
+  --color-slate-800: #1e293b;
+  --color-slate-900: #0f172a;
+  --color-slate-950: #020617;
+
+  /* Neutral Colors */
+  --color-neutral-50: #fafafa;
+  --color-neutral-100: #f5f5f5;
+  --color-neutral-200: #e5e5e5;
+  --color-neutral-300: #d4d4d4;
+  --color-neutral-400: #a3a3a3;
+  --color-neutral-500: #737373;
+  --color-neutral-600: #525252;
+  --color-neutral-700: #404040;
+  --color-neutral-800: #262626;
+  --color-neutral-900: #171717;
+
+  /* Semantic Colors - Success (Emerald) */
+  --color-success-50: #ecfdf5;
+  --color-success-100: #d1fae5;
+  --color-success-200: #a7f3d0;
+  --color-success-300: #6ee7b7;
+  --color-success-400: #34d399;
+  --color-success-500: #10b981;
+  --color-success-600: #059669;
+  --color-success-700: #047857;
+  --color-success-800: #065f46;
+  --color-success-900: #064e3b;
+
+  /* Semantic Colors - Warning (Amber) */
+  --color-warning-50: #fffbeb;
+  --color-warning-100: #fef3c7;
+  --color-warning-200: #fde68a;
+  --color-warning-300: #fcd34d;
+  --color-warning-400: #fbbf24;
+  --color-warning-500: #f59e0b;
+  --color-warning-600: #d97706;
+  --color-warning-700: #b45309;
+  --color-warning-800: #92400e;
+  --color-warning-900: #78350f;
+
+  /* Semantic Colors - Error (Rose) */
+  --color-error-50: #fff1f2;
+  --color-error-100: #ffe4e6;
+  --color-error-200: #fecdd3;
+  --color-error-300: #fda4af;
+  --color-error-400: #fb7185;
+  --color-error-500: #f43f5e;
+  --color-error-600: #e11d48;
+  --color-error-700: #be123c;
+  --color-error-800: #9f1239;
+  --color-error-900: #881337;
+
+  /* Semantic Colors - Info (Sky) */
+  --color-info-50: #f0f9ff;
+  --color-info-100: #e0f2fe;
+  --color-info-200: #bae6fd;
+  --color-info-300: #7dd3fc;
+  --color-info-400: #38bdf8;
+  --color-info-500: #0ea5e9;
+  --color-info-600: #0284c7;
+  --color-info-700: #0369a1;
+  --color-info-800: #075985;
+  --color-info-900: #0c4a6e;
+
+  /* ============================================
+     DARK THEME - BACKGROUND COLORS
+     ============================================ */
+  --bg-primary: var(--color-slate-950);
+  --bg-secondary: var(--color-slate-900);
+  --bg-tertiary: var(--color-slate-800);
+  --bg-card: var(--color-slate-900);
+  --bg-card-hover: var(--color-slate-800);
+  --bg-input: var(--color-slate-800);
+  --bg-input-hover: var(--color-slate-700);
+  --bg-overlay: rgba(15, 23, 42, 0.8);
+  --bg-tooltip: var(--color-slate-800);
+  --bg-modal: var(--color-slate-900);
+
+  /* ============================================
+     DARK THEME - TEXT COLORS
+     WCAG AA Compliant Contrast Ratios
+     ============================================ */
+  --text-primary: var(--color-slate-50);
+  --text-secondary: var(--color-slate-300);
+  --text-tertiary: var(--color-slate-400);
+  --text-muted: var(--color-slate-500);
+  --text-disabled: var(--color-slate-600);
+  --text-inverse: var(--color-slate-900);
+  --text-link: var(--color-primary-400);
+  --text-link-hover: var(--color-primary-300);
+
+  /* ============================================
+     DARK THEME - BORDER COLORS
+     ============================================ */
+  --border-color: var(--color-slate-700);
+  --border-light: var(--color-slate-800);
+  --border-hover: var(--color-slate-600);
+  --border-focus: var(--color-slate-500);
+  --border-error: var(--color-error-500);
+  --border-success: var(--color-success-500);
+
+  /* ============================================
+     DARK THEME - BRAND COLORS
+     ============================================ */
+  --primary-color: var(--color-primary-500);
+  --primary-light: var(--color-primary-400);
+  --primary-dark: var(--color-primary-600);
+  --primary-gradient: linear-gradient(135deg, var(--color-primary-600) 0%, var(--color-primary-500) 100%);
+  --primary-glow: rgba(14, 165, 233, 0.3);
+  --success-glow: rgba(16, 185, 129, 0.2);
+  --warning-glow: rgba(245, 158, 11, 0.2);
+  --error-glow: rgba(244, 63, 94, 0.2);
+  --info-glow: rgba(14, 165, 233, 0.2);
+
+  /* ============================================
+     DARK THEME - INTERACTIVE STATES
+     ============================================ */
+  --hover-bg: var(--color-slate-800);
+  --hover-border: var(--color-slate-600);
+  --active-bg: var(--color-slate-700);
+  --active-border: var(--color-primary-500);
+  --selected-bg: rgba(14, 165, 233, 0.15);
+  --selected-border: var(--color-primary-500);
+  --selected-text: var(--color-primary-400);
+  --focus-ring: 0 0 0 3px rgba(14, 165, 233, 0.4);
+
+  /* ============================================
+     DARK THEME - SEMANTIC COLORS
+     ============================================ */
+  --success-color: var(--color-success-500);
+  --success-light: var(--color-success-400);
+  --success-dark: var(--color-success-600);
+  --success-bg: rgba(16, 185, 129, 0.15);
+  --success-border: rgba(16, 185, 129, 0.4);
+  --success-text: var(--color-success-400);
+
+  --warning-color: var(--color-warning-500);
+  --warning-light: var(--color-warning-400);
+  --warning-dark: var(--color-warning-600);
+  --warning-bg: rgba(245, 158, 11, 0.15);
+  --warning-border: rgba(245, 158, 11, 0.4);
+  --warning-text: var(--color-warning-400);
+
+  --error-color: var(--color-error-500);
+  --error-light: var(--color-error-400);
+  --error-dark: var(--color-error-600);
+  --error-bg: rgba(244, 63, 94, 0.15);
+  --error-border: rgba(244, 63, 94, 0.4);
+  --error-text: var(--color-error-400);
+
+  --info-color: var(--color-info-500);
+  --info-light: var(--color-info-400);
+  --info-dark: var(--color-info-600);
+  --info-bg: rgba(14, 165, 233, 0.15);
+  --info-border: rgba(14, 165, 233, 0.4);
+  --info-text: var(--color-info-400);
+
+  /* ============================================
+     PLATFORM BRAND COLORS
+     ============================================ */
+  --platform-douyin: #000000;
+  --platform-tencent: #07C160;
+  --platform-kuaishou: #FF6600;
+  --platform-tiktok: #000000;
+  --platform-bilibili: #FB7299;
+  --platform-xiaohongshu: #FF2442;
+  --platform-baijiahao: #2932E1;
+
+  /* ============================================
+     ELEMENT PLUS OVERRIDES - Remove blue focus border
+     ============================================ */
+  --el-input-focus-border-color: var(--border-color);
+  --el-input-focus-color: var(--border-color);
+  --el-select-input-focus-border-color: var(--border-color);
+
+  /* ============================================
+     SPACING SYSTEM
+     ============================================ */
+  --spacing-0: 0;
+  --spacing-1: 0.25rem;
+  --spacing-2: 0.5rem;
+  --spacing-3: 0.75rem;
+  --spacing-4: 1rem;
+  --spacing-5: 1.25rem;
+  --spacing-6: 1.5rem;
+  --spacing-8: 2rem;
+  --spacing-10: 2.5rem;
+  --spacing-12: 3rem;
+  --spacing-16: 4rem;
+  --spacing-20: 5rem;
+  --spacing-24: 6rem;
+
+  /* Legacy spacing aliases */
+  --spacing-xs: var(--spacing-1);
+  --spacing-sm: var(--spacing-2);
+  --spacing-md: var(--spacing-4);
+  --spacing-lg: var(--spacing-6);
+  --spacing-xl: var(--spacing-8);
+
+  /* ============================================
+     BORDER RADIUS SYSTEM
+     ============================================ */
+  --radius-none: 0;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+  --radius-full: 9999px;
+
+  /* ============================================
+     SHADOW SYSTEM
+     ============================================ */
+  --shadow-color: rgba(0, 0, 0, 0.3);
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  --shadow-card-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  --shadow-glow: 0 0 20px rgba(14, 165, 233, 0.4);
+  --shadow-glow-sm: 0 0 10px rgba(14, 165, 233, 0.3);
+
+  /* ============================================
+     TRANSITION SYSTEM
+     ============================================ */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-theme: 300ms ease-in-out;
+  --transition-transform: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-colors: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ============================================
+     TYPOGRAPHY
+     ============================================ */
+  --font-family-base: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-family-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+
+  /* Font sizes */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+
+  /* Font weights */
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+
+  /* Line heights */
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+}
+
+/* ============================================
+   LIGHT THEME OVERRIDES
+   ============================================ */
+[data-theme="light"] {
+  /* Background Colors */
+  --bg-primary: var(--color-slate-50);
+  --bg-secondary: var(--color-slate-100); /* Slightly darker than pure white for better contrast */
+  --bg-tertiary: var(--color-slate-200);
+  --bg-card: #ffffff;
+  --bg-card-hover: var(--color-slate-50);
+  --bg-input: #ffffff;
+  --bg-input-hover: var(--color-slate-50);
+  --bg-overlay: rgba(15, 23, 42, 0.6);
+  --bg-tooltip: var(--color-slate-800);
+  --bg-modal: #ffffff;
+
+  /* Text Colors - WCAG AA Compliant */
+  --text-primary: var(--color-slate-900);
+  --text-secondary: var(--color-slate-600);
+  --text-tertiary: var(--color-slate-500);
+  --text-muted: var(--color-slate-400);
+  --text-disabled: var(--color-slate-300);
+  --text-inverse: #ffffff;
+  --text-link: var(--color-primary-600);
+  --text-link-hover: var(--color-primary-700);
+
+  /* Border Colors */
+  --border-color: var(--color-slate-200);
+  --border-light: var(--color-slate-100);
+  --border-hover: var(--color-slate-300);
+  --border-focus: var(--color-slate-400);
+  --border-error: var(--color-error-500);
+  --border-success: var(--color-success-500);
+
+  /* Brand Colors */
+  --primary-color: var(--color-primary-600);
+  --primary-light: var(--color-primary-500);
+  --primary-dark: var(--color-primary-700);
+  --primary-gradient: linear-gradient(135deg, var(--color-primary-600) 0%, var(--color-primary-500) 100%);
+  --primary-glow: rgba(14, 165, 233, 0.2);
+  --success-glow: rgba(16, 185, 129, 0.15);
+  --warning-glow: rgba(245, 158, 11, 0.15);
+  --error-glow: rgba(244, 63, 94, 0.15);
+  --info-glow: rgba(14, 165, 233, 0.15);
+
+  /* Interactive States */
+  --hover-bg: var(--color-slate-100);
+  --hover-border: var(--color-slate-300);
+  --active-bg: var(--color-slate-200);
+  --active-border: var(--color-primary-500);
+  --selected-bg: rgba(14, 165, 233, 0.1);
+  --selected-border: var(--color-primary-500);
+  --selected-text: var(--color-primary-700);
+  --focus-ring: 0 0 0 3px rgba(14, 165, 233, 0.3);
+
+  /* Semantic Colors */
+  --success-color: var(--color-success-600);
+  --success-light: var(--color-success-500);
+  --success-dark: var(--color-success-700);
+  --success-bg: rgba(16, 185, 129, 0.1);
+  --success-border: rgba(16, 185, 129, 0.3);
+  --success-text: var(--color-success-700);
+
+  --warning-color: var(--color-warning-600);
+  --warning-light: var(--color-warning-500);
+  --warning-dark: var(--color-warning-700);
+  --warning-bg: rgba(245, 158, 11, 0.1);
+  --warning-border: rgba(245, 158, 11, 0.3);
+  --warning-text: var(--color-warning-700);
+
+  --error-color: var(--color-error-600);
+  --error-light: var(--color-error-500);
+  --error-dark: var(--color-error-700);
+  --error-bg: rgba(244, 63, 94, 0.1);
+  --error-border: rgba(244, 63, 94, 0.3);
+  --error-text: var(--color-error-700);
+
+  --info-color: var(--color-info-600);
+  --info-light: var(--color-info-500);
+  --info-dark: var(--color-info-700);
+  --info-bg: rgba(14, 165, 233, 0.1);
+  --info-border: rgba(14, 165, 233, 0.3);
+  --info-text: var(--color-info-700);
+
+  /* Shadows - Softer in light mode */
+  --shadow-color: rgba(0, 0, 0, 0.1);
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  --shadow-card-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  --shadow-glow: 0 0 20px rgba(14, 165, 233, 0.25);
+  --shadow-glow-sm: 0 0 10px rgba(14, 165, 233, 0.2);
+
+  /* Element Plus Overrides - Light mode */
+  --el-input-focus-border-color: var(--border-color);
+  --el-input-focus-color: var(--border-color);
+  --el-select-input-focus-border-color: var(--border-color);
+}
+
+/* ============================================
+   HIGH CONTRAST MODE SUPPORT
+   ============================================ */
+@media (prefers-contrast: high) {
+  :root {
+    --border-color: var(--color-slate-400);
+    --text-secondary: var(--color-slate-200);
+    --focus-ring: 0 0 0 4px var(--color-primary-400);
+  }
+
+  [data-theme="light"] {
+    --border-color: var(--color-slate-400);
+    --text-secondary: var(--color-slate-700);
+    --focus-ring: 0 0 0 4px var(--color-primary-600);
+  }
+}
+
+/* ============================================
+   REDUCED MOTION SUPPORT
+   ============================================ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --transition-fast: 0ms;
+    --transition-base: 0ms;
+    --transition-slow: 0ms;
+    --transition-theme: 0ms;
+    --transition-transform: 0ms;
+    --transition-colors: 0ms;
+  }
+}

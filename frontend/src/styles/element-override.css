@@ -1,0 +1,22 @@
+/**
+ * Element Plus CSS Variable Overrides
+ * This file must be imported BEFORE 'element-plus/dist/index.css'
+ * to override the default focus border color
+ */
+
+:root {
+  /* Override Element Plus input focus border color - remove blue */
+  --el-input-focus-border-color: #9ca3af !important;
+  --el-input-focus-color: #9ca3af !important;
+  --el-select-input-focus-border-color: #9ca3af !important;
+
+  /* Light theme overrides */
+  --el-color-primary: #0ea5e9;
+}
+
+/* Dark theme overrides */
+[data-theme="dark"] {
+  --el-input-focus-border-color: #4b5563 !important;
+  --el-input-focus-color: #4b5563 !important;
+  --el-select-input-focus-border-color: #4b5563 !important;
+}
