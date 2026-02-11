@@ -3,8 +3,8 @@ import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useScheduleStore, useThemeStore, useScreenshotStore } from '../stores'
 import { getAppVersion } from '../api'
-import { getHeadlessConfig, setHeadlessConfig } from '../api/system'
-import type { AppVersion } from '../types'
+import { getHeadlessConfig, setHeadlessConfig, getBrowserPoolConfig, setBrowserPoolConfig } from '../api/system'
+import type { AppVersion, BrowserPoolConfig } from '../types'
 
 const scheduleStore = useScheduleStore()
 const themeStore = useThemeStore()
@@ -14,6 +14,24 @@ const appVersion = ref<AppVersion | null>(null)
 const timeInput = ref('')
 const headlessMode = ref(false)
 const headlessLoading = ref(false)
+
+// 浏览器池配置
+const browserPoolConfig = ref<BrowserPoolConfig>({
+  maxBrowsers: 2,
+  maxContextsPerBrowser: 5,
+  contextIdleTimeout: 30,
+  enableHealthCheck: true,
+  healthCheckInterval: 60,
+  contextReuseMode: 'conservative'
+})
+const browserPoolLoading = ref(false)
+
+// 复用模式选项
+const reuseModeOptions = [
+  { label: '禁用复用（适合偶尔使用）', value: 'disabled', description: '每次新建上下文，无等待开销' },
+  { label: '保守复用（默认）', value: 'conservative', description: '30秒空闲后才复用上下文' },
+  { label: '激进复用（适合批量上传）', value: 'aggressive', description: '立即复用上下文，跳过等待' }
+]
 
 async function handleSaveSchedule() {
   try {
@@ -88,6 +106,18 @@ async function handleHeadlessModeChange() {
   }
 }
 
+async function handleSaveBrowserPoolConfig() {
+  browserPoolLoading.value = true
+  try {
+    await setBrowserPoolConfig(browserPoolConfig.value)
+    ElMessage.success('浏览器池配置已保存')
+  } catch (error) {
+    ElMessage.error('保存失败')
+  } finally {
+    browserPoolLoading.value = false
+  }
+}
+
 onMounted(async () => {
   scheduleStore.fetchConfig()
   screenshotStore.fetchConfig()
@@ -95,8 +125,12 @@ onMounted(async () => {
   try {
     appVersion.value = await getAppVersion()
     headlessMode.value = await getHeadlessConfig()
+    const poolConfig = await getBrowserPoolConfig()
+    if (poolConfig) {
+      browserPoolConfig.value = poolConfig
+    }
   } catch (error) {
-    console.error('获取版本信息失败:', error)
+    console.error('获取配置失败:', error)
   }
 })
 </script>
@@ -159,7 +193,101 @@ onMounted(async () => {
                 开启后，上传视频时浏览器窗口将隐藏运行，不显示界面
               </div>
             </el-form-item>
+
+            <el-divider />
+
+            <!-- 浏览器池配置 -->
+            <el-form-item label="上下文复用模式">
+              <el-radio-group v-model="browserPoolConfig.contextReuseMode" class="reuse-mode-group">
+                <el-radio-button 
+                  v-for="option in reuseModeOptions" 
+                  :key="option.value" 
+                  :label="option.value"
+                >
+                  {{ option.label }}
+                </el-radio-button>
+              </el-radio-group>
+              <div class="form-hint">
+                {{ reuseModeOptions.find(o => o.value === browserPoolConfig.contextReuseMode)?.description }}
+              </div>
+            </el-form-item>
+
+            <el-form-item label="最大浏览器实例数">
+              <el-slider
+                v-model="browserPoolConfig.maxBrowsers"
+                :min="1"
+                :max="5"
+                show-stops
+              />
+              <span class="slider-value">{{ browserPoolConfig.maxBrowsers }} 个</span>
+              <div class="form-hint">
+                同时运行的浏览器进程数量，多账号场景建议设为2-3
+              </div>
+            </el-form-item>
+
+            <el-form-item label="每浏览器最大上下文数">
+              <el-slider
+                v-model="browserPoolConfig.maxContextsPerBrowser"
+                :min="1"
+                :max="10"
+                show-stops
+              />
+              <span class="slider-value">{{ browserPoolConfig.maxContextsPerBrowser }} 个</span>
+              <div class="form-hint">
+                每个浏览器进程可同时管理的账号数量
+              </div>
+            </el-form-item>
+
+            <el-form-item label="上下文空闲超时">
+              <el-slider
+                v-model="browserPoolConfig.contextIdleTimeout"
+                :min="10"
+                :max="120"
+                :step="10"
+                show-stops
+              />
+              <span class="slider-value">{{ browserPoolConfig.contextIdleTimeout }} 秒</span>
+              <div class="form-hint">
+                上下文释放后等待复用的时间，超过此时间将关闭
+              </div>
+            </el-form-item>
+
+            <el-form-item>
+              <template #label>
+                <div class="form-label-with-tag">
+                  <span>健康检查</span>
+                  <el-tag v-if="browserPoolConfig.enableHealthCheck" type="success" size="small">已启用</el-tag>
+                  <el-tag v-else type="info" size="small">已禁用</el-tag>
+                </div>
+              </template>
+              <el-switch
+                v-model="browserPoolConfig.enableHealthCheck"
+                active-text="开启"
+                inactive-text="关闭"
+              />
+              <div class="form-hint">
+                定期检查浏览器实例健康状态，自动重启异常实例
+              </div>
+            </el-form-item>
+
+            <el-form-item label="健康检查间隔" v-if="browserPoolConfig.enableHealthCheck">
+              <el-slider
+                v-model="browserPoolConfig.healthCheckInterval"
+                :min="30"
+                :max="300"
+                :step="30"
+                show-stops
+              />
+              <span class="slider-value">{{ browserPoolConfig.healthCheckInterval }} 秒</span>
+            </el-form-item>
           </el-form>
+
+          <div class="form-actions">
+            <el-button type="primary" @click="handleSaveBrowserPoolConfig" :loading="browserPoolLoading">
+              <el-icon><Check /></el-icon>
+              保存配置
+            </el-button>
+          </div>
         </div>
       </div>
 
@@ -555,5 +683,15 @@ onMounted(async () => {
 .setting-label {
   font-size: 14px;
   color: var(--text-secondary);
+}
+
+.reuse-mode-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.reuse-mode-group :deep(.el-radio-button__inner) {
+  padding: 8px 16px;
 }
 </style>

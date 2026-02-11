@@ -29,3 +29,13 @@ export interface AppVersion {
   goVersion: string
   wailsVersion: string
 }
+
+// 浏览器池配置
+export interface BrowserPoolConfig {
+  maxBrowsers: number
+  maxContextsPerBrowser: number
+  contextIdleTimeout: number
+  enableHealthCheck: boolean
+  healthCheckInterval: number
+  contextReuseMode: 'disabled' | 'conservative' | 'aggressive'
+}

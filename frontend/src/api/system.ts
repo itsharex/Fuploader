@@ -2,9 +2,11 @@ import {
   GetAppVersion,
   OpenDirectory,
   GetHeadlessConfig,
-  SetHeadlessConfig
+  SetHeadlessConfig,
+  GetBrowserPoolConfig,
+  SetBrowserPoolConfig
 } from '../../wailsjs/go/app/App'
-import type { AppVersion } from '../types'
+import type { AppVersion, BrowserPoolConfig } from '../types'
 
 // 获取应用版本
 export async function getAppVersion(): Promise<AppVersion> {
@@ -44,6 +46,35 @@ export async function setHeadlessConfig(headless: boolean): Promise<void> {
     await SetHeadlessConfig(headless)
   } catch (error) {
     console.error('设置无头模式配置失败:', error)
+    throw error
+  }
+}
+
+// 获取浏览器池配置
+export async function getBrowserPoolConfig(): Promise<BrowserPoolConfig> {
+  try {
+    const result = await GetBrowserPoolConfig()
+    return result as BrowserPoolConfig
+  } catch (error) {
+    console.error('获取浏览器池配置失败:', error)
+    // 返回默认配置
+    return {
+      maxBrowsers: 2,
+      maxContextsPerBrowser: 5,
+      contextIdleTimeout: 30,
+      enableHealthCheck: true,
+      healthCheckInterval: 60,
+      contextReuseMode: 'conservative'
+    }
+  }
+}
+
+// 设置浏览器池配置
+export async function setBrowserPoolConfig(config: BrowserPoolConfig): Promise<void> {
+  try {
+    await SetBrowserPoolConfig(config)
+  } catch (error) {
+    console.error('设置浏览器池配置失败:', error)
     throw error
   }
 }

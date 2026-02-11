@@ -88,16 +88,27 @@ type UploadTask struct {
 	UpdatedAt    string  `json:"updatedAt"`
 
 	// 平台特定字段
-	Title        string `json:"title"`        // 用户自定义标题（覆盖视频标题）
-	Collection   string `json:"collection"`   // 视频号合集名称
-	ShortTitle   string `json:"shortTitle"`   // 视频号短标题
-	IsOriginal   bool   `json:"isOriginal"`   // 是否声明原创
-	OriginalType string `json:"originalType"` // 原创类型
-	Location     string `json:"location"`     // 地理位置
-	Thumbnail    string `json:"thumbnail"`    // 封面路径
-	SyncToutiao  bool   `json:"syncToutiao"`  // 同步到今日头条
-	SyncXigua    bool   `json:"syncXigua"`    // 同步到西瓜视频
-	IsDraft      bool   `json:"isDraft"`      // 是否保存为草稿
+	Title               string `json:"title"`               // 用户自定义标题（覆盖视频标题）
+	Collection          string `json:"collection"`          // 视频号合集名称
+	ShortTitle          string `json:"shortTitle"`          // 视频号短标题
+	IsOriginal          bool   `json:"isOriginal"`          // 是否声明原创
+	OriginalType        string `json:"originalType"`        // 原创类型
+	Location            string `json:"location"`            // 地理位置
+	Thumbnail           string `json:"thumbnail"`           // 封面路径
+	SyncToutiao         bool   `json:"syncToutiao"`         // 同步到今日头条
+	SyncXigua           bool   `json:"syncXigua"`           // 同步到西瓜视频
+	IsDraft             bool   `json:"isDraft"`             // 是否保存为草稿
+	Copyright           string `json:"copyright"`           // 转载类型（B站）：1=自制，2=转载
+	AllowDownload       bool   `json:"allowDownload"`       // 是否允许下载（抖音/快手）
+	AllowComment        bool   `json:"allowComment"`        // 是否允许评论（抖音/TikTok）
+	AllowDuet           bool   `json:"allowDuet"`           // 是否允许合拍（TikTok）
+	AIDeclaration       bool   `json:"aiDeclaration"`       // AI创作声明（百家号）
+	AutoGenerateAudio   bool   `json:"autoGenerateAudio"`   // 自动生成音频（百家号）
+	CoverType           string `json:"coverType"`           // 封面模式（百家号）：auto/single/triple
+	Category            string `json:"category"`            // 分类（百家号）
+	UseIframe           bool   `json:"useIframe"`           // 是否使用iframe模式（TikTok）
+	UseFileChooser      bool   `json:"useFileChooser"`      // 是否使用文件选择器（快手）
+	SkipNewFeatureGuide bool   `json:"skipNewFeatureGuide"` // 是否跳过新功能引导（快手）
 }
 
 func (t *UploadTask) BeforeCreate(tx *gorm.DB) (err error) {

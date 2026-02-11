@@ -107,6 +107,17 @@ export namespace database {
 	    syncToutiao: boolean;
 	    syncXigua: boolean;
 	    isDraft: boolean;
+	    copyright: string;
+	    allowDownload: boolean;
+	    allowComment: boolean;
+	    allowDuet: boolean;
+	    aiDeclaration: boolean;
+	    autoGenerateAudio: boolean;
+	    coverType: string;
+	    category: string;
+	    useIframe: boolean;
+	    useFileChooser: boolean;
+	    skipNewFeatureGuide: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new UploadTask(source);
@@ -138,6 +149,17 @@ export namespace database {
 	        this.syncToutiao = source["syncToutiao"];
 	        this.syncXigua = source["syncXigua"];
 	        this.isDraft = source["isDraft"];
+	        this.copyright = source["copyright"];
+	        this.allowDownload = source["allowDownload"];
+	        this.allowComment = source["allowComment"];
+	        this.allowDuet = source["allowDuet"];
+	        this.aiDeclaration = source["aiDeclaration"];
+	        this.autoGenerateAudio = source["autoGenerateAudio"];
+	        this.coverType = source["coverType"];
+	        this.category = source["category"];
+	        this.useIframe = source["useIframe"];
+	        this.useFileChooser = source["useFileChooser"];
+	        this.skipNewFeatureGuide = source["skipNewFeatureGuide"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -195,6 +217,28 @@ export namespace types {
 	        this.buildTime = source["buildTime"];
 	        this.goVersion = source["goVersion"];
 	        this.wailsVersion = source["wailsVersion"];
+	    }
+	}
+	export class BrowserPoolConfig {
+	    maxBrowsers: number;
+	    maxContextsPerBrowser: number;
+	    contextIdleTimeout: number;
+	    enableHealthCheck: boolean;
+	    healthCheckInterval: number;
+	    contextReuseMode: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new BrowserPoolConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.maxBrowsers = source["maxBrowsers"];
+	        this.maxContextsPerBrowser = source["maxContextsPerBrowser"];
+	        this.contextIdleTimeout = source["contextIdleTimeout"];
+	        this.enableHealthCheck = source["enableHealthCheck"];
+	        this.healthCheckInterval = source["healthCheckInterval"];
+	        this.contextReuseMode = source["contextReuseMode"];
 	    }
 	}
 	export class Collection {

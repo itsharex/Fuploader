@@ -43,6 +43,8 @@ export function GetAppStatus():Promise<types.AppStatus>;
 
 export function GetAppVersion():Promise<types.AppVersion>;
 
+export function GetBrowserPoolConfig():Promise<types.BrowserPoolConfig>;
+
 export function GetCollections(arg1:string):Promise<Array<types.Collection>>;
 
 export function GetHeadlessConfig():Promise<boolean>;
@@ -80,6 +82,8 @@ export function SelectFile(arg1:string):Promise<string>;
 export function SelectImageFile():Promise<string>;
 
 export function SelectVideoFile():Promise<string>;
+
+export function SetBrowserPoolConfig(arg1:types.BrowserPoolConfig):Promise<void>;
 
 export function SetHeadlessConfig(arg1:boolean):Promise<void>;
 

@@ -5,6 +5,7 @@ import (
 	"Fuploader/internal/database"
 	"Fuploader/internal/platform/baijiahao"
 	"Fuploader/internal/platform/bilibili"
+	"Fuploader/internal/platform/browser"
 	"Fuploader/internal/platform/douyin"
 	"Fuploader/internal/platform/kuaishou"
 	"Fuploader/internal/platform/tiktok"
@@ -950,5 +951,37 @@ func (a *App) SetHeadlessConfig(headless bool) error {
 	} else {
 		utils.Info("[-] 浏览器无头模式已禁用")
 	}
+	return nil
+}
+
+// GetBrowserPoolConfig 获取浏览器池配置
+func (a *App) GetBrowserPoolConfig() (types.BrowserPoolConfig, error) {
+	cfg := browser.LoadPoolConfig()
+	return types.BrowserPoolConfig{
+		MaxBrowsers:           cfg.MaxBrowsers,
+		MaxContextsPerBrowser: cfg.MaxContextsPerBrowser,
+		ContextIdleTimeout:    cfg.ContextIdleTimeout,
+		EnableHealthCheck:     cfg.EnableHealthCheck,
+		HealthCheckInterval:   cfg.HealthCheckInterval,
+		ContextReuseMode:      string(cfg.ContextReuseMode),
+	}, nil
+}
+
+// SetBrowserPoolConfig 设置浏览器池配置
+func (a *App) SetBrowserPoolConfig(cfg types.BrowserPoolConfig) error {
+	poolCfg := browser.PoolConfig{
+		MaxBrowsers:           cfg.MaxBrowsers,
+		MaxContextsPerBrowser: cfg.MaxContextsPerBrowser,
+		ContextIdleTimeout:    cfg.ContextIdleTimeout,
+		EnableHealthCheck:     cfg.EnableHealthCheck,
+		HealthCheckInterval:   cfg.HealthCheckInterval,
+		ContextReuseMode:      browser.ContextReuseMode(cfg.ContextReuseMode),
+	}
+
+	if err := browser.SavePoolConfig(&poolCfg); err != nil {
+		return fmt.Errorf("保存浏览器池配置失败: %w", err)
+	}
+
+	utils.Info(fmt.Sprintf("[+] 浏览器池配置已更新 - 模式: %s", cfg.ContextReuseMode))
 	return nil
 }

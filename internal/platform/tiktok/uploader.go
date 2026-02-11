@@ -32,13 +32,15 @@ func init() {
 
 // Uploader TikTok上传器
 type Uploader struct {
+	accountID  uint
 	cookiePath string
 	platform   string
 }
 
-// NewUploader 创建上传器
+// NewUploader 创建上传器（兼容旧版，使用cookiePath）
 func NewUploader(cookiePath string) *Uploader {
 	u := &Uploader{
+		accountID:  0,
 		cookiePath: cookiePath,
 		platform:   "tiktok",
 	}
@@ -46,6 +48,18 @@ func NewUploader(cookiePath string) *Uploader {
 	if cookiePath == "" {
 		utils.Warn("[TikTok] NewUploader 收到空的cookiePath!")
 	}
+	return u
+}
+
+// NewUploaderWithAccount 创建带accountID的上传器（新接口）
+func NewUploaderWithAccount(accountID uint) *Uploader {
+	cookiePath := config.GetCookiePath("tiktok", int(accountID))
+	u := &Uploader{
+		accountID:  accountID,
+		cookiePath: cookiePath,
+		platform:   "tiktok",
+	}
+	debugLog("创建上传器 - 地址: %p, accountID: %d, cookiePath: '%s'", u, accountID, cookiePath)
 	return u
 }
 
@@ -59,27 +73,29 @@ func (u *Uploader) ValidateCookie(ctx context.Context) (bool, error) {
 	utils.InfoWithPlatform(u.platform, "验证Cookie")
 
 	if _, err := os.Stat(u.cookiePath); os.IsNotExist(err) {
-		utils.WarnWithPlatform(u.platform, "Cookie文件不存在")
+		utils.WarnWithPlatform(u.platform, "失败: 验证Cookie - Cookie文件不存在")
 		return false, nil
 	}
 
-	browserCtx, err := browserPool.GetContext(ctx, u.cookiePath, u.getContextOptions())
+	// 使用accountID获取上下文（如果accountID为0则退化为旧逻辑）
+	browserCtx, err := browserPool.GetContextByAccount(ctx, u.accountID, u.cookiePath, u.getContextOptions())
 	if err != nil {
-		utils.WarnWithPlatform(u.platform, fmt.Sprintf("获取浏览器失败: %v", err))
+		utils.WarnWithPlatform(u.platform, fmt.Sprintf("失败: 验证Cookie - 获取浏览器失败: %v", err))
 		return false, nil
 	}
 	defer browserCtx.Release()
 
 	page, err := browserCtx.GetPage()
 	if err != nil {
-		utils.WarnWithPlatform(u.platform, fmt.Sprintf("获取页面失败: %v", err))
+		utils.WarnWithPlatform(u.platform, fmt.Sprintf("失败: 验证Cookie - 获取页面失败: %v", err))
 		return false, nil
 	}
 
+	utils.InfoWithPlatform(u.platform, "正在打开发布页面...")
 	if _, err := page.Goto("https://www.tiktok.com/tiktokstudio/upload?lang=en", playwright.PageGotoOptions{
 		WaitUntil: playwright.WaitUntilStateNetworkidle,
 	}); err != nil {
-		utils.WarnWithPlatform(u.platform, fmt.Sprintf("打开页面失败: %v", err))
+		utils.WarnWithPlatform(u.platform, fmt.Sprintf("失败: 验证Cookie - 打开页面失败: %v", err))
 		return false, nil
 	}
 
@@ -88,18 +104,18 @@ func (u *Uploader) ValidateCookie(ctx context.Context) (bool, error) {
 	// 使用Cookie检测机制验证登录状态
 	cookieConfig, ok := browser.GetCookieConfig("tiktok")
 	if !ok {
-		return false, fmt.Errorf("获取TikTok Cookie配置失败")
+		return false, fmt.Errorf("失败: 验证Cookie - 获取TikTok Cookie配置失败")
 	}
 
 	isValid, err := browserCtx.ValidateLoginCookies(cookieConfig)
 	if err != nil {
-		return false, fmt.Errorf("验证Cookie失败: %w", err)
+		return false, fmt.Errorf("失败: 验证Cookie - 验证失败: %w", err)
 	}
 
 	if isValid {
-		utils.InfoWithPlatform(u.platform, "检测到sessionid Cookie，验证通过")
+		utils.InfoWithPlatform(u.platform, "登录成功")
 	} else {
-		utils.InfoWithPlatform(u.platform, "未检测到sessionid Cookie，验证失败")
+		utils.WarnWithPlatform(u.platform, "失败: 验证Cookie - Cookie无效或已过期")
 	}
 
 	return isValid, nil
@@ -113,7 +129,8 @@ func (u *Uploader) Upload(ctx context.Context, task *types.VideoTask) error {
 		return fmt.Errorf("视频文件不存在: %w", err)
 	}
 
-	browserCtx, err := browserPool.GetContext(ctx, u.cookiePath, u.getContextOptions())
+	// 使用accountID获取上下文（如果accountID为0则退化为旧逻辑）
+	browserCtx, err := browserPool.GetContextByAccount(ctx, u.accountID, u.cookiePath, u.getContextOptions())
 	if err != nil {
 		return fmt.Errorf("获取浏览器失败: %w", err)
 	}
@@ -125,11 +142,11 @@ func (u *Uploader) Upload(ctx context.Context, task *types.VideoTask) error {
 	}
 
 	// 导航到上传页面
-	utils.InfoWithPlatform(u.platform, "正在打开上传页面...")
+	utils.InfoWithPlatform(u.platform, "正在打开发布页面...")
 	if _, err := page.Goto("https://www.tiktok.com/tiktokstudio/upload", playwright.PageGotoOptions{
 		WaitUntil: playwright.WaitUntilStateNetworkidle,
 	}); err != nil {
-		return fmt.Errorf("打开上传页面失败: %w", err)
+		return fmt.Errorf("失败: 打开发布页面 - %w", err)
 	}
 	time.Sleep(3 * time.Second)
 
@@ -139,10 +156,10 @@ func (u *Uploader) Upload(ctx context.Context, task *types.VideoTask) error {
 	if iframeCount > 0 {
 		frame := page.FrameLocator("iframe[data-tt='Upload_index_iframe']")
 		locatorBase = frame.Locator("div.upload-container")
-		utils.InfoWithPlatform(u.platform, "检测到iframe结构")
+		debugLog("检测到iframe结构")
 	} else {
 		locatorBase = page.Locator("div.upload-container")
-		utils.InfoWithPlatform(u.platform, "使用普通容器结构")
+		debugLog("使用普通容器结构")
 	}
 
 	// 上传视频
@@ -154,34 +171,34 @@ func (u *Uploader) Upload(ctx context.Context, task *types.VideoTask) error {
 
 	// 填写标题和描述
 	if err := u.fillTitleAndDescription(locatorBase, task.Title, task.Description); err != nil {
-		utils.WarnWithPlatform(u.platform, fmt.Sprintf("填写标题和描述失败: %v", err))
+		utils.WarnWithPlatform(u.platform, fmt.Sprintf("失败: 填写标题和描述 - %v", err))
 	}
 
 	// 添加话题标签
 	if len(task.Tags) > 0 {
 		if err := u.addTags(locatorBase, task.Tags); err != nil {
-			utils.WarnWithPlatform(u.platform, fmt.Sprintf("添加标签失败: %v", err))
+			utils.WarnWithPlatform(u.platform, fmt.Sprintf("失败: 添加标签 - %v", err))
 		}
 	}
 
 	// 设置封面
 	if task.Thumbnail != "" {
 		if err := u.setCover(page, locatorBase, task.Thumbnail); err != nil {
-			utils.WarnWithPlatform(u.platform, fmt.Sprintf("设置封面失败: %v", err))
+			utils.WarnWithPlatform(u.platform, fmt.Sprintf("失败: 设置封面 - %v", err))
 		}
 	}
 
 	// 设置定时发布
 	if task.ScheduleTime != nil && *task.ScheduleTime != "" {
 		if err := u.setScheduleTime(locatorBase, *task.ScheduleTime); err != nil {
-			utils.WarnWithPlatform(u.platform, fmt.Sprintf("设置定时发布失败: %v", err))
+			utils.WarnWithPlatform(u.platform, fmt.Sprintf("失败: 设置定时发布 - %v", err))
 		}
 	}
 
 	// 点击发布
 	utils.InfoWithPlatform(u.platform, "准备发布...")
 	if err := u.publish(page, locatorBase, browserCtx); err != nil {
-		return fmt.Errorf("发布失败: %w", err)
+		return fmt.Errorf("失败: 发布 - %w", err)
 	}
 
 	utils.SuccessWithPlatform(u.platform, "发布成功")
@@ -196,18 +213,18 @@ func (u *Uploader) uploadVideo(ctx context.Context, page playwright.Page, browse
 	if err := uploadButton.WaitFor(playwright.LocatorWaitForOptions{
 		State: playwright.WaitForSelectorStateVisible,
 	}); err != nil {
-		return fmt.Errorf("上传按钮不可见: %w", err)
+		return fmt.Errorf("失败: 上传视频 - 上传按钮不可见: %w", err)
 	}
 
 	fileChooser, err := page.ExpectFileChooser(func() error {
 		return uploadButton.Click()
 	})
 	if err != nil {
-		return fmt.Errorf("等待文件选择器失败: %w", err)
+		return fmt.Errorf("失败: 上传视频 - 等待文件选择器失败: %w", err)
 	}
 
 	if err := fileChooser.SetFiles(videoPath); err != nil {
-		return fmt.Errorf("设置视频文件失败: %w", err)
+		return fmt.Errorf("失败: 上传视频 - 设置视频文件失败: %w", err)
 	}
 
 	// 等待上传完成
@@ -216,6 +233,7 @@ func (u *Uploader) uploadVideo(ctx context.Context, page playwright.Page, browse
 		return err
 	}
 
+	utils.InfoWithPlatform(u.platform, "视频上传完成")
 	return nil
 }
 
@@ -240,7 +258,6 @@ func (u *Uploader) waitForUploadComplete(ctx context.Context, page playwright.Pa
 		postButton := locatorBase.Locator("div.btn-post > button")
 		disabledAttr, _ := postButton.GetAttribute("disabled")
 		if disabledAttr == "" || disabledAttr == "false" {
-			utils.InfoWithPlatform(u.platform, "视频上传完成（发布按钮可用）")
 			return nil
 		}
 
@@ -248,7 +265,6 @@ func (u *Uploader) waitForUploadComplete(ctx context.Context, page playwright.Pa
 		videoPreview := locatorBase.Locator("video, .video-preview").First()
 		if count, _ := videoPreview.Count(); count > 0 {
 			if visible, _ := videoPreview.IsVisible(); visible {
-				utils.InfoWithPlatform(u.platform, "视频上传完成（检测到预览）")
 				return nil
 			}
 		}
@@ -256,12 +272,12 @@ func (u *Uploader) waitForUploadComplete(ctx context.Context, page playwright.Pa
 		// 检测上传错误并重试
 		selectFileBtn := locatorBase.Locator("button[aria-label='Select file']")
 		if count, _ := selectFileBtn.Count(); count > 0 {
-			utils.WarnWithPlatform(u.platform, "检测到上传错误，正在重试...")
+			utils.WarnWithPlatform(u.platform, "失败: 上传视频 - 检测到上传错误，正在重试...")
 			_, err := page.ExpectFileChooser(func() error {
 				return selectFileBtn.Click()
 			})
 			if err != nil {
-				return fmt.Errorf("重试文件选择失败: %w", err)
+				return fmt.Errorf("失败: 上传视频 - 重试文件选择失败: %w", err)
 			}
 			// 这里需要重新获取视频路径，简化处理
 		}
@@ -269,12 +285,12 @@ func (u *Uploader) waitForUploadComplete(ctx context.Context, page playwright.Pa
 		time.Sleep(uploadCheckInterval)
 	}
 
-	return fmt.Errorf("上传超时")
+	return fmt.Errorf("失败: 上传视频 - 上传超时")
 }
 
 // fillTitleAndDescription 填写标题和描述
 func (u *Uploader) fillTitleAndDescription(locatorBase playwright.Locator, title, description string) error {
-	utils.InfoWithPlatform(u.platform, "填写标题和描述...")
+	utils.InfoWithPlatform(u.platform, "填写标题...")
 
 	editorLocator := locatorBase.Locator("div.public-DraftEditor-content")
 	if err := editorLocator.WaitFor(playwright.LocatorWaitForOptions{
@@ -310,13 +326,19 @@ func (u *Uploader) fillTitleAndDescription(locatorBase playwright.Locator, title
 	page.Keyboard().Press("End")
 	page.Keyboard().Press("Enter")
 
-	utils.InfoWithPlatform(u.platform, "标题和描述已填写")
+	utils.InfoWithPlatform(u.platform, fmt.Sprintf("标题已填写: %s", title))
+
+	if description != "" {
+		utils.InfoWithPlatform(u.platform, "填写描述...")
+		utils.InfoWithPlatform(u.platform, "描述已填写")
+	}
+
 	return nil
 }
 
 // addTags 添加话题标签
 func (u *Uploader) addTags(locatorBase playwright.Locator, tags []string) error {
-	utils.InfoWithPlatform(u.platform, fmt.Sprintf("添加%d个标签...", len(tags)))
+	utils.InfoWithPlatform(u.platform, "添加标签...")
 
 	page, err := locatorBase.Page()
 	if err != nil {
@@ -384,7 +406,6 @@ func (u *Uploader) setCover(page playwright.Page, locatorBase playwright.Locator
 		return fmt.Errorf("上传封面失败: %w", err)
 	}
 
-	utils.InfoWithPlatform(u.platform, "封面上传中...")
 	time.Sleep(3 * time.Second)
 
 	// 点击确认
@@ -400,7 +421,7 @@ func (u *Uploader) setCover(page playwright.Page, locatorBase playwright.Locator
 
 // setScheduleTime 设置定时发布
 func (u *Uploader) setScheduleTime(locatorBase playwright.Locator, scheduleTime string) error {
-	utils.InfoWithPlatform(u.platform, fmt.Sprintf("设置定时发布时间: %s", scheduleTime))
+	utils.InfoWithPlatform(u.platform, "设置定时发布...")
 
 	// 解析时间
 	publishDate, err := time.Parse("2006-01-02 15:04", scheduleTime)
@@ -481,7 +502,6 @@ func (u *Uploader) setScheduleTime(locatorBase playwright.Locator, scheduleTime 
 	uploadTitle := locatorBase.Locator("h1:has-text('Upload video')")
 	uploadTitle.Click()
 
-	utils.InfoWithPlatform(u.platform, fmt.Sprintf("定时发布时间设置完成: %s", scheduleTime))
 	return nil
 }
 
@@ -504,23 +524,19 @@ func (u *Uploader) publish(page playwright.Page, locatorBase playwright.Locator,
 		// 检测成功标志
 		successLocator := locatorBase.Locator(successFlagDiv)
 		if visible, _ := successLocator.IsVisible(); visible {
-			utils.InfoWithPlatform(u.platform, "发布成功")
 			return nil
 		}
 
 		if count, _ := successLocator.Count(); count > 0 {
-			utils.InfoWithPlatform(u.platform, "发布成功")
 			return nil
 		}
 
 		// 检测URL跳转
 		url := page.URL()
 		if url == "https://www.tiktok.com/tiktokstudio/content" {
-			utils.InfoWithPlatform(u.platform, "发布成功，页面已跳转")
 			return nil
 		}
 
-		utils.InfoWithPlatform(u.platform, "等待发布完成...")
 		time.Sleep(500 * time.Millisecond)
 	}
 }
@@ -563,9 +579,9 @@ func (u *Uploader) Login() error {
 	}
 
 	ctx := context.Background()
-	utils.InfoWithPlatform(u.platform, fmt.Sprintf("Cookie保存路径: %s", u.cookiePath))
 
-	browserCtx, err := browserPool.GetContext(ctx, "", u.getContextOptions())
+	// 登录时不使用accountID（因为是新登录）
+	browserCtx, err := browserPool.GetContextByAccount(ctx, 0, "", u.getContextOptions())
 	if err != nil {
 		return fmt.Errorf("获取浏览器失败: %w", err)
 	}
@@ -576,14 +592,12 @@ func (u *Uploader) Login() error {
 		return fmt.Errorf("获取页面失败: %w", err)
 	}
 
-	utils.InfoWithPlatform(u.platform, "正在打开登录页面...")
+	utils.InfoWithPlatform(u.platform, "正在打开发布页面...")
 	if _, err := page.Goto("https://www.tiktok.com/login?lang=en", playwright.PageGotoOptions{
 		WaitUntil: playwright.WaitUntilStateNetworkidle,
 	}); err != nil {
-		return fmt.Errorf("打开登录页面失败: %w", err)
+		return fmt.Errorf("失败: 打开登录页面 - %w", err)
 	}
-
-	utils.InfoWithPlatform(u.platform, "请在浏览器窗口中完成登录")
 
 	// 使用Cookie检测机制等待登录成功
 	cookieConfig, ok := browser.GetCookieConfig("tiktok")
@@ -592,14 +606,13 @@ func (u *Uploader) Login() error {
 	}
 
 	if err := browserCtx.WaitForLoginCookies(cookieConfig); err != nil {
-		return fmt.Errorf("等待登录Cookie失败: %w", err)
+		return fmt.Errorf("失败: 等待登录Cookie - %w", err)
 	}
 
-	utils.SuccessWithPlatform(u.platform, "登录成功，检测到sessionid Cookie")
+	utils.SuccessWithPlatform(u.platform, "登录成功")
 	if err := browserCtx.SaveCookiesTo(u.cookiePath); err != nil {
-		return fmt.Errorf("保存Cookie失败: %w", err)
+		return fmt.Errorf("失败: 保存Cookie - %w", err)
 	}
-	utils.InfoWithPlatform(u.platform, "Cookie已保存")
 	return nil
 }
 

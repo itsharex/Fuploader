@@ -82,6 +82,10 @@ export function GetAppVersion() {
   return window['go']['app']['App']['GetAppVersion']();
 }
 
+export function GetBrowserPoolConfig() {
+  return window['go']['app']['App']['GetBrowserPoolConfig']();
+}
+
 export function GetCollections(arg1) {
   return window['go']['app']['App']['GetCollections'](arg1);
 }
@@ -156,6 +160,10 @@ export function SelectImageFile() {
 
 export function SelectVideoFile() {
   return window['go']['app']['App']['SelectVideoFile']();
+}
+
+export function SetBrowserPoolConfig(arg1) {
+  return window['go']['app']['App']['SetBrowserPoolConfig'](arg1);
 }
 
 export function SetHeadlessConfig(arg1) {

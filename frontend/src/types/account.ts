@@ -237,7 +237,8 @@ export const PLATFORM_PUBLISH_FIELDS: Record<PlatformType, PlatformField[]> = {
       { label: '单图', value: 'single' },
       { label: '三图', value: 'triple' }
     ], defaultValue: 'auto' },
-    { key: 'original', label: '原创文章', type: 'switch', defaultValue: true },
+    { key: 'aiDeclaration', label: 'AI创作声明', type: 'switch', defaultValue: false },
+    { key: 'autoGenerateAudio', label: '自动生成音频', type: 'switch', defaultValue: false },
     { key: 'waitCoverGenerated', label: '等待封面生成', type: 'switch', defaultValue: true, internal: true },
     { key: 'checkSecurityVerify', label: '检测安全验证', type: 'switch', defaultValue: true, internal: true },
     { 

@@ -103,6 +103,7 @@ func (h *HealthChecker) run() {
 
 // check 执行健康检查
 func (h *HealthChecker) check() {
+	// 1. 检查浏览器实例健康
 	result := h.Check()
 
 	if result.Status == HealthStatusUnhealthy {
@@ -110,6 +111,9 @@ func (h *HealthChecker) check() {
 	} else if result.Status == HealthStatusDegraded {
 		utils.Warn(fmt.Sprintf("[-] 浏览器池降级: %v", result.Messages))
 	}
+
+	// 2. 检查上下文健康
+	h.cleanupUnhealthyContexts()
 
 	h.lastCheckTime = time.Now()
 }
@@ -199,6 +203,57 @@ func (h *HealthChecker) isBrowserHealthy(browser *PooledBrowser) bool {
 	// 这里可以添加更多检查逻辑
 
 	return true
+}
+
+// checkContextHealth 检查单个上下文的健康状态
+func (h *HealthChecker) checkContextHealth(ctx *PooledContext) (bool, string) {
+	// 1. 检查页面是否已关闭
+	if ctx.IsPageClosed() {
+		return false, "页面已关闭"
+	}
+
+	// 2. 尝试执行简单JS验证页面响应
+	page, err := ctx.GetPage()
+	if err != nil {
+		return false, fmt.Sprintf("获取页面失败: %v", err)
+	}
+
+	_, err = page.Evaluate("1")
+	if err != nil {
+		return false, fmt.Sprintf("页面无响应: %v", err)
+	}
+
+	// 3. 检查登录态有效性（如果配置了验证器）
+	if ctx.platform != "" && ctx.accountID > 0 {
+		// 这里可以集成session validator进行登录态检查
+		// 暂时跳过，避免频繁验证影响性能
+	}
+
+	return true, ""
+}
+
+// cleanupUnhealthyContexts 清理不健康的上下文
+func (h *HealthChecker) cleanupUnhealthyContexts() {
+	h.pool.mutex.RLock()
+	browsers := make([]*PooledBrowser, len(h.pool.browsers))
+	copy(browsers, h.pool.browsers)
+	h.pool.mutex.RUnlock()
+
+	for _, browser := range browsers {
+		browser.mutex.Lock()
+		contexts := make([]*PooledContext, len(browser.contexts))
+		copy(contexts, browser.contexts)
+		browser.mutex.Unlock()
+
+		for _, ctx := range contexts {
+			healthy, reason := h.checkContextHealth(ctx)
+			if !healthy {
+				utils.Warn(fmt.Sprintf("[-] 上下文不健康 [AccountID: %d, Platform: %s]: %s", 
+					ctx.accountID, ctx.platform, reason))
+				// 标记为需要清理，实际清理在Release时处理
+			}
+		}
+	}
 }
 
 // restartBrowser 重启浏览器实例

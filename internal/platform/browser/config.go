@@ -8,13 +8,23 @@ import (
 	"sync"
 )
 
+// ContextReuseMode 上下文复用模式
+type ContextReuseMode string
+
+const (
+	ReuseModeDisabled   ContextReuseMode = "disabled"   // 禁用复用，每次新建上下文（适合偶尔使用）
+	ReuseModeConservative ContextReuseMode = "conservative" // 保守复用，30秒空闲后复用（默认）
+	ReuseModeAggressive ContextReuseMode = "aggressive" // 激进复用，立即复用（适合批量上传）
+)
+
 // PoolConfig 浏览器池配置
 type PoolConfig struct {
-	MaxBrowsers           int  `json:"max_browsers"`             // 最大浏览器实例数
-	MaxContextsPerBrowser int  `json:"max_contexts_per_browser"` // 每个浏览器的最大上下文数
-	ContextIdleTimeout    int  `json:"context_idle_timeout"`     // 上下文空闲超时时间（秒）
-	EnableHealthCheck     bool `json:"enable_health_check"`      // 是否启用健康检查
-	HealthCheckInterval   int  `json:"health_check_interval"`    // 健康检查间隔（秒）
+	MaxBrowsers           int              `json:"max_browsers"`             // 最大浏览器实例数
+	MaxContextsPerBrowser int              `json:"max_contexts_per_browser"` // 每个浏览器的最大上下文数
+	ContextIdleTimeout    int              `json:"context_idle_timeout"`     // 上下文空闲超时时间（秒）
+	EnableHealthCheck     bool             `json:"enable_health_check"`      // 是否启用健康检查
+	HealthCheckInterval   int              `json:"health_check_interval"`    // 健康检查间隔（秒）
+	ContextReuseMode      ContextReuseMode `json:"context_reuse_mode"`       // 上下文复用模式
 }
 
 // DefaultPoolConfig 默认配置
@@ -24,6 +34,7 @@ var DefaultPoolConfig = PoolConfig{
 	ContextIdleTimeout:    30,
 	EnableHealthCheck:     true,
 	HealthCheckInterval:   60,
+	ContextReuseMode:      ReuseModeConservative, // 默认保守复用
 }
 
 var (
@@ -125,6 +136,9 @@ func UpdateConfig(updates map[string]interface{}) error {
 	}
 	if v, ok := updates["health_check_interval"].(float64); ok {
 		cfg.HealthCheckInterval = int(v)
+	}
+	if v, ok := updates["context_reuse_mode"].(string); ok {
+		cfg.ContextReuseMode = ContextReuseMode(v)
 	}
 
 	return SavePoolConfig(cfg)

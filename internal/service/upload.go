@@ -172,6 +172,19 @@ func (s *UploadService) applyPlatformFields(task *database.UploadTask, fields ty
 	task.SyncToutiao = fields.SyncToutiao
 	task.SyncXigua = fields.SyncXigua
 	task.IsDraft = fields.IsDraft
+	if fields.Copyright != "" {
+		task.Copyright = fields.Copyright
+	}
+	task.AllowDownload = fields.AllowDownload
+	task.AllowComment = fields.AllowComment
+	task.AllowDuet = fields.AllowDuet
+	task.AIDeclaration = fields.AIDeclaration
+	task.AutoGenerateAudio = fields.AutoGenerateAudio
+	task.CoverType = fields.CoverType
+	task.Category = fields.Category
+	task.UseIframe = fields.UseIframe
+	task.UseFileChooser = fields.UseFileChooser
+	task.SkipNewFeatureGuide = fields.SkipNewFeatureGuide
 }
 
 func (s *UploadService) GetUploadTasks(ctx context.Context, status string) ([]database.UploadTask, error) {
@@ -304,22 +317,36 @@ func (s *UploadService) executeTask(ctx context.Context, taskID int) {
 		thumbnail = task.Video.Thumbnail
 	}
 
+	// 将 URL 路径转换为本地文件系统路径
+	thumbnail = convertThumbnailURLToPath(thumbnail)
+
 	videoTask := &types.VideoTask{
-		Platform:     task.Platform,
-		VideoPath:    task.Video.FilePath,
-		Title:        title,
-		Description:  task.Video.Description,
-		Tags:         task.Video.Tags,
-		Thumbnail:    thumbnail,
-		ScheduleTime: task.ScheduleTime,
-		IsDraft:      task.IsDraft,
-		Location:     task.Location,
-		SyncToutiao:  task.SyncToutiao,
-		SyncXigua:    task.SyncXigua,
-		ShortTitle:   task.ShortTitle,
-		IsOriginal:   task.IsOriginal,
-		OriginalType: task.OriginalType,
-		Collection:   task.Collection,
+		Platform:            task.Platform,
+		VideoPath:           task.Video.FilePath,
+		Title:               title,
+		Description:         task.Video.Description,
+		Tags:                task.Video.Tags,
+		Thumbnail:           thumbnail,
+		ScheduleTime:        task.ScheduleTime,
+		IsDraft:             task.IsDraft,
+		Location:            task.Location,
+		SyncToutiao:         task.SyncToutiao,
+		SyncXigua:           task.SyncXigua,
+		ShortTitle:          task.ShortTitle,
+		IsOriginal:          task.IsOriginal,
+		OriginalType:        task.OriginalType,
+		Collection:          task.Collection,
+		Copyright:           task.Copyright,
+		AllowDownload:       task.AllowDownload,
+		AllowComment:        task.AllowComment,
+		AllowDuet:           task.AllowDuet,
+		AIDeclaration:       task.AIDeclaration,
+		AutoGenerateAudio:   task.AutoGenerateAudio,
+		CoverType:           task.CoverType,
+		Category:            task.Category,
+		UseIframe:           task.UseIframe,
+		UseFileChooser:      task.UseFileChooser,
+		SkipNewFeatureGuide: task.SkipNewFeatureGuide,
 	}
 
 	var uploader types.Uploader
@@ -435,4 +462,33 @@ func (s *UploadService) updateTaskFailed(taskID int, errorMsg string) {
 	task.Status = config.TaskStatusFailed
 	task.ErrorMsg = errorMsg
 	s.db.Save(&task)
+}
+
+// convertThumbnailURLToPath 将封面 URL 路径转换为本地文件系统路径
+// 例如: /thumbnails/thumb_1_123.jpg -> D:\storage\thumbnails\thumb_1_123.jpg
+func convertThumbnailURLToPath(thumbnail string) string {
+	if thumbnail == "" {
+		return ""
+	}
+
+	// 如果已经是本地路径（包含盘符或绝对路径），直接返回
+	if filepath.IsAbs(thumbnail) {
+		return thumbnail
+	}
+
+	// 如果是 URL 路径（以 /thumbnails/ 开头），转换为本地路径
+	if len(thumbnail) > 12 && thumbnail[:12] == "/thumbnails/" {
+		// 提取文件名
+		filename := filepath.Base(thumbnail)
+		return filepath.Join(config.Config.ThumbnailPath, filename)
+	}
+
+	// 如果是 URL 路径（以 /videos/ 开头），转换为本地路径
+	if len(thumbnail) > 8 && thumbnail[:8] == "/videos/" {
+		filename := filepath.Base(thumbnail)
+		return filepath.Join(config.Config.VideoPath, filename)
+	}
+
+	// 其他情况，假设是相对路径，拼接到缩略图目录
+	return filepath.Join(config.Config.ThumbnailPath, filepath.Base(thumbnail))
 }

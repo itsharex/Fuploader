@@ -40,13 +40,23 @@ type Pool struct {
 	statsMutex  sync.RWMutex
 }
 
+// PlatformCache 平台级资源缓存
+type PlatformCache struct {
+	DNSEntries      map[string]string // DNS解析缓存: hostname -> IP
+	StaticResources map[string][]byte // 静态资源缓存: URL -> content
+	LastAccessed    time.Time         // 最后访问时间
+	AccessCount     int               // 访问计数
+}
+
 // PooledBrowser 池化浏览器
 type PooledBrowser struct {
-	browser  playwright.Browser
-	contexts []*PooledContext
-	lastUsed time.Time
-	inUse    int
-	mutex    sync.Mutex
+	browser         playwright.Browser
+	contexts        []*PooledContext
+	platformContext map[string]int            // 平台上下文计数，用于亲和性调度
+	platformCache   map[string]*PlatformCache // 平台级资源缓存
+	lastUsed        time.Time
+	inUse           int
+	mutex           sync.Mutex
 }
 
 // PooledContext 封装的浏览器上下文
@@ -54,10 +64,11 @@ type PooledContext struct {
 	context    playwright.BrowserContext
 	page       playwright.Page
 	cookiePath string
+	accountID  uint   // 账号ID，用于精准定位
+	platform   string // 平台标识，用于日志
 	createdAt  time.Time
 	lastUsed   time.Time
 	parent     *PooledBrowser
-	platform   string // 平台标识，用于日志
 }
 
 // ContextOptions 上下文选项
@@ -99,8 +110,35 @@ func NewPoolFromConfig() *Pool {
 	return NewPool(poolConfig.MaxBrowsers, poolConfig.MaxContextsPerBrowser)
 }
 
-// GetContext 获取浏览器上下文
+// GetContext 获取浏览器上下文（兼容旧版）
 func (p *Pool) GetContext(ctx context.Context, cookiePath string, options *ContextOptions) (*PooledContext, error) {
+	return p.GetContextByAccount(ctx, 0, cookiePath, options)
+}
+
+// GetContextByAccount 通过accountID获取浏览器上下文（新接口，根据配置选择复用策略）
+func (p *Pool) GetContextByAccount(ctx context.Context, accountID uint, cookiePath string, options *ContextOptions) (*PooledContext, error) {
+	// 根据配置选择复用策略
+	cfg := LoadPoolConfig()
+	
+	switch cfg.ContextReuseMode {
+	case ReuseModeDisabled:
+		// 禁用复用，直接创建新上下文
+		return p.createNewContext(ctx, accountID, "", cookiePath, options)
+	case ReuseModeAggressive:
+		// 激进复用，立即复用
+		if accountID > 0 {
+			return p.getOrCreateContextImmediate(ctx, accountID, "", cookiePath, options)
+		}
+		// 如果没有accountID，退化为保守模式
+		return p.getOrCreateContextWithIdleTimeout(ctx, accountID, "", cookiePath, options)
+	default: // ReuseModeConservative
+		// 保守复用，30秒空闲后复用
+		return p.getOrCreateContextWithIdleTimeout(ctx, accountID, "", cookiePath, options)
+	}
+}
+
+// getOrCreateContextWithIdleTimeout 获取上下文（带空闲超时检查）
+func (p *Pool) getOrCreateContextWithIdleTimeout(ctx context.Context, accountID uint, platform string, cookiePath string, options *ContextOptions) (*PooledContext, error) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
@@ -114,27 +152,237 @@ func (p *Pool) GetContext(ctx context.Context, cookiePath string, options *Conte
 		options = p.generateRandomFingerprint(options)
 	}
 
-	// 1. 尝试复用现有上下文
+	// 1. 尝试复用现有上下文（通过accountID + cookiePath双重匹配，带30秒空闲检查）
 	for _, browser := range p.browsers {
-		if pooledCtx := browser.getIdleContext(cookiePath); pooledCtx != nil {
+		if pooledCtx := browser.getIdleContextByKey(accountID, cookiePath); pooledCtx != nil {
 			p.updateStats()
 			return pooledCtx, nil
 		}
 	}
 
 	// 2. 创建新上下文
+	return p.createNewContextLocked(ctx, accountID, platform, cookiePath, options)
+}
+
+// getOrCreateContextImmediate 获取上下文（立即复用，跳过空闲检查）
+func (p *Pool) getOrCreateContextImmediate(ctx context.Context, accountID uint, platform string, cookiePath string, options *ContextOptions) (*PooledContext, error) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	// 使用默认选项
+	if options == nil {
+		options = DefaultContextOptions()
+	}
+
+	// 如果启用反检测，生成随机指纹
+	if options.EnableAntiDetect {
+		options = p.generateRandomFingerprint(options)
+	}
+
+	// 1. 尝试立即复用现有上下文（跳过30秒空闲检查）
+	for _, browser := range p.browsers {
+		if pooledCtx := browser.getContextImmediate(accountID, cookiePath); pooledCtx != nil {
+			utils.Info(fmt.Sprintf("[-] 立即复用上下文 - AccountID: %d", accountID))
+			p.updateStats()
+			return pooledCtx, nil
+		}
+	}
+
+	// 2. 创建新上下文
+	return p.createNewContextLocked(ctx, accountID, platform, cookiePath, options)
+}
+
+// createNewContext 创建新上下文（公共方法）
+func (p *Pool) createNewContext(ctx context.Context, accountID uint, platform string, cookiePath string, options *ContextOptions) (*PooledContext, error) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+	return p.createNewContextLocked(ctx, accountID, platform, cookiePath, options)
+}
+
+// createNewContextLocked 创建新上下文（内部方法，需要持有锁）
+func (p *Pool) createNewContextLocked(ctx context.Context, accountID uint, platform string, cookiePath string, options *ContextOptions) (*PooledContext, error) {
+	// 使用默认选项
+	if options == nil {
+		options = DefaultContextOptions()
+	}
+
+	// 如果启用反检测，生成随机指纹
+	if options.EnableAntiDetect {
+		options = p.generateRandomFingerprint(options)
+	}
+
+	// 创建新上下文
 	browser, err := p.getOrCreateBrowser()
 	if err != nil {
 		return nil, err
 	}
 
-	pooledCtx, err := browser.createContext(cookiePath, options)
+	pooledCtx, err := browser.createContextWithPlatform(accountID, platform, cookiePath, options)
 	if err != nil {
 		return nil, err
 	}
 
 	p.updateStats()
 	return pooledCtx, nil
+}
+
+// GetContextWithAffinity 获取浏览器上下文（带平台亲和性）
+// 优先将同平台账号分配到同一浏览器进程，共享DNS缓存和静态资源
+func (p *Pool) GetContextWithAffinity(ctx context.Context, accountID uint, platform string, options *ContextOptions) (*PooledContext, error) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	// 使用默认选项
+	if options == nil {
+		options = DefaultContextOptions()
+	}
+
+	// 如果启用反检测，生成随机指纹
+	if options.EnableAntiDetect {
+		options = p.generateRandomFingerprint(options)
+	}
+
+	cookiePath := config.GetCookiePath(platform, int(accountID))
+
+	// 1. 尝试复用现有上下文
+	for _, browser := range p.browsers {
+		if pooledCtx := browser.getIdleContextByKey(accountID, cookiePath); pooledCtx != nil {
+			p.updateStats()
+			return pooledCtx, nil
+		}
+	}
+
+	// 2. 创建新上下文（带平台亲和性）
+	browser, err := p.getOrCreateBrowserWithAffinity(platform)
+	if err != nil {
+		return nil, err
+	}
+
+	pooledCtx, err := browser.createContextWithPlatform(accountID, platform, cookiePath, options)
+	if err != nil {
+		return nil, err
+	}
+
+	p.updateStats()
+	return pooledCtx, nil
+}
+
+// GetContextImmediate 立即获取上下文（跳过30秒等待，用于同任务连续操作）
+func (p *Pool) GetContextImmediate(ctx context.Context, accountID uint, platform string, options *ContextOptions) (*PooledContext, error) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	// 使用默认选项
+	if options == nil {
+		options = DefaultContextOptions()
+	}
+
+	// 如果启用反检测，生成随机指纹
+	if options.EnableAntiDetect {
+		options = p.generateRandomFingerprint(options)
+	}
+
+	cookiePath := config.GetCookiePath(platform, int(accountID))
+
+	// 1. 尝试立即复用现有上下文（跳过30秒等待）
+	for _, browser := range p.browsers {
+		if pooledCtx := browser.getContextImmediate(accountID, cookiePath); pooledCtx != nil {
+			utils.Info(fmt.Sprintf("[-] 立即复用上下文 - AccountID: %d, Platform: %s", accountID, platform))
+			p.updateStats()
+			return pooledCtx, nil
+		}
+	}
+
+	// 2. 未找到可复用的上下文，创建新上下文
+	browser, err := p.getOrCreateBrowserWithAffinity(platform)
+	if err != nil {
+		return nil, err
+	}
+
+	pooledCtx, err := browser.createContextWithPlatform(accountID, platform, cookiePath, options)
+	if err != nil {
+		return nil, err
+	}
+
+	utils.Info(fmt.Sprintf("[-] 创建新上下文 - AccountID: %d, Platform: %s", accountID, platform))
+	p.updateStats()
+	return pooledCtx, nil
+}
+
+// RecoverContext 恢复指定账号的上下文（异常恢复入口）
+func (p *Pool) RecoverContext(ctx context.Context, accountID uint, platform string) (*PooledContext, error) {
+	utils.Info(fmt.Sprintf("[-] 尝试恢复上下文 - AccountID: %d, Platform: %s", accountID, platform))
+
+	// 1. 尝试找到现有上下文
+	cookiePath := config.GetCookiePath(platform, int(accountID))
+
+	p.mutex.Lock()
+	for _, browser := range p.browsers {
+		for _, c := range browser.contexts {
+			if c.accountID == accountID && c.cookiePath == cookiePath {
+				p.mutex.Unlock()
+
+				// 2. 检查上下文健康状态
+				if c.IsHealthy() {
+					utils.Info(fmt.Sprintf("[-] 上下文健康，无需恢复 - AccountID: %d", accountID))
+					return c, nil
+				}
+
+				// 3. 尝试恢复页面
+				if err := c.RecoverPage(); err != nil {
+					utils.Warn(fmt.Sprintf("[-] 页面恢复失败: %v", err))
+					// 4. 页面恢复失败，尝试重新创建上下文
+					c.Close()
+					return p.GetContextWithAffinity(ctx, accountID, platform, nil)
+				}
+
+				utils.Info(fmt.Sprintf("[-] 上下文恢复成功 - AccountID: %d", accountID))
+				return c, nil
+			}
+		}
+	}
+	p.mutex.Unlock()
+
+	// 5. 未找到现有上下文，创建新上下文
+	utils.Info(fmt.Sprintf("[-] 未找到现有上下文，创建新上下文 - AccountID: %d", accountID))
+	return p.GetContextWithAffinity(ctx, accountID, platform, nil)
+}
+
+// CleanupAndRecover 清理不健康上下文并恢复（定时任务调用）
+func (p *Pool) CleanupAndRecover() {
+	utils.Info("[-] 执行清理和恢复任务...")
+
+	p.mutex.Lock()
+	browsers := make([]*PooledBrowser, len(p.browsers))
+	copy(browsers, p.browsers)
+	p.mutex.Unlock()
+
+	recoveredCount := 0
+	cleanedCount := 0
+
+	for _, browser := range browsers {
+		browser.mutex.Lock()
+		contexts := make([]*PooledContext, len(browser.contexts))
+		copy(contexts, browser.contexts)
+		browser.mutex.Unlock()
+
+		for _, ctx := range contexts {
+			if !ctx.IsHealthy() {
+				utils.Warn(fmt.Sprintf("[-] 发现不健康上下文 [AccountID: %d, Platform: %s]，尝试恢复",
+					ctx.accountID, ctx.platform))
+
+				if err := ctx.RecoverPage(); err != nil {
+					utils.Error(fmt.Sprintf("[-] 恢复失败，清理上下文: %v", err))
+					ctx.Close()
+					cleanedCount++
+				} else {
+					recoveredCount++
+				}
+			}
+		}
+	}
+
+	utils.Info(fmt.Sprintf("[-] 清理和恢复完成 - 恢复: %d, 清理: %d", recoveredCount, cleanedCount))
 }
 
 // generateRandomFingerprint 生成随机浏览器指纹
@@ -262,6 +510,44 @@ func (p *Pool) getOrCreateBrowser() (*PooledBrowser, error) {
 	return nil, fmt.Errorf("max browsers reached")
 }
 
+// getOrCreateBrowserWithAffinity 获取或创建浏览器实例（带平台亲和性）
+func (p *Pool) getOrCreateBrowserWithAffinity(platform string) (*PooledBrowser, error) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	// 1. 优先查找已有该平台上下文的浏览器（亲和性）
+	for _, b := range p.browsers {
+		if b.hasPlatformContext(platform) && b.canCreateContext(p.maxContexts) {
+			return b, nil
+		}
+	}
+
+	// 2. 查找有空闲容量的浏览器
+	for _, b := range p.browsers {
+		if b.canCreateContext(p.maxContexts) {
+			return b, nil
+		}
+	}
+
+	// 3. 创建新浏览器
+	if len(p.browsers) < p.maxBrowsers {
+		browser, err := p.launchBrowser()
+		if err != nil {
+			return nil, err
+		}
+
+		pooled := &PooledBrowser{
+			browser:         browser,
+			contexts:        make([]*PooledContext, 0),
+			platformContext: make(map[string]int),
+		}
+		p.browsers = append(p.browsers, pooled)
+		return pooled, nil
+	}
+
+	return nil, fmt.Errorf("max browsers reached")
+}
+
 // launchBrowser 启动浏览器
 func (p *Pool) launchBrowser() (playwright.Browser, error) {
 	pw, err := playwright.Run()
@@ -315,7 +601,133 @@ func (b *PooledBrowser) canCreateContext(maxContexts int) bool {
 	return len(b.contexts) < maxContexts
 }
 
-// getIdleContext 获取空闲上下文
+// hasPlatformContext 检查是否有指定平台的上下文（用于亲和性调度）
+func (b *PooledBrowser) hasPlatformContext(platform string) bool {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	if b.platformContext == nil {
+		return false
+	}
+	return b.platformContext[platform] > 0
+}
+
+// incrementPlatformCount 增加平台上下文计数
+func (b *PooledBrowser) incrementPlatformCount(platform string) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	if b.platformContext == nil {
+		b.platformContext = make(map[string]int)
+	}
+	b.platformContext[platform]++
+}
+
+// decrementPlatformCount 减少平台上下文计数
+func (b *PooledBrowser) decrementPlatformCount(platform string) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	if b.platformContext != nil && b.platformContext[platform] > 0 {
+		b.platformContext[platform]--
+	}
+}
+
+// ==================== 平台级资源缓存方法 ====================
+
+// getOrCreatePlatformCache 获取或创建平台缓存
+func (b *PooledBrowser) getOrCreatePlatformCache(platform string) *PlatformCache {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	if b.platformCache == nil {
+		b.platformCache = make(map[string]*PlatformCache)
+	}
+
+	if cache, exists := b.platformCache[platform]; exists {
+		cache.LastAccessed = time.Now()
+		cache.AccessCount++
+		return cache
+	}
+
+	cache := &PlatformCache{
+		DNSEntries:      make(map[string]string),
+		StaticResources: make(map[string][]byte),
+		LastAccessed:    time.Now(),
+		AccessCount:     1,
+	}
+	b.platformCache[platform] = cache
+	return cache
+}
+
+// getPlatformCache 获取平台缓存（只读）
+func (b *PooledBrowser) getPlatformCache(platform string) (*PlatformCache, bool) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	if b.platformCache == nil {
+		return nil, false
+	}
+
+	cache, exists := b.platformCache[platform]
+	if exists {
+		cache.LastAccessed = time.Now()
+		cache.AccessCount++
+	}
+	return cache, exists
+}
+
+// cacheDNS 缓存DNS解析结果
+func (b *PooledBrowser) cacheDNS(platform, hostname, ip string) {
+	cache := b.getOrCreatePlatformCache(platform)
+	cache.DNSEntries[hostname] = ip
+}
+
+// getCachedDNS 获取缓存的DNS解析结果
+func (b *PooledBrowser) getCachedDNS(platform, hostname string) (string, bool) {
+	cache, exists := b.getPlatformCache(platform)
+	if !exists {
+		return "", false
+	}
+	ip, exists := cache.DNSEntries[hostname]
+	return ip, exists
+}
+
+// cacheStaticResource 缓存静态资源
+func (b *PooledBrowser) cacheStaticResource(platform, url string, content []byte) {
+	cache := b.getOrCreatePlatformCache(platform)
+	// 限制缓存大小，避免内存溢出
+	if len(content) < 1024*1024 { // 只缓存小于1MB的资源
+		cache.StaticResources[url] = content
+	}
+}
+
+// getCachedStaticResource 获取缓存的静态资源
+func (b *PooledBrowser) getCachedStaticResource(platform, url string) ([]byte, bool) {
+	cache, exists := b.getPlatformCache(platform)
+	if !exists {
+		return nil, false
+	}
+	content, exists := cache.StaticResources[url]
+	return content, exists
+}
+
+// cleanupPlatformCache 清理过期的平台缓存
+func (b *PooledBrowser) cleanupPlatformCache(maxAge time.Duration) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	if b.platformCache == nil {
+		return
+	}
+
+	now := time.Now()
+	for platform, cache := range b.platformCache {
+		if now.Sub(cache.LastAccessed) > maxAge {
+			delete(b.platformCache, platform)
+			utils.Info(fmt.Sprintf("[-] 清理过期平台缓存: %s", platform))
+		}
+	}
+}
+
+// getIdleContext 获取空闲上下文（兼容旧版，仅通过cookiePath匹配）
 func (b *PooledBrowser) getIdleContext(cookiePath string) *PooledContext {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
@@ -330,8 +742,49 @@ func (b *PooledBrowser) getIdleContext(cookiePath string) *PooledContext {
 	return nil
 }
 
-// createContext 创建浏览器上下文
+// getIdleContextByKey 通过accountID和cookiePath双重匹配获取空闲上下文
+func (b *PooledBrowser) getIdleContextByKey(accountID uint, cookiePath string) *PooledContext {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	for _, ctx := range b.contexts {
+		if ctx.accountID == accountID && ctx.cookiePath == cookiePath && time.Since(ctx.lastUsed) > 30*time.Second {
+			ctx.lastUsed = time.Now()
+			b.inUse++
+			return ctx
+		}
+	}
+	return nil
+}
+
+// getContextImmediate 立即获取上下文（跳过30秒等待，用于同任务连续操作）
+func (b *PooledBrowser) getContextImmediate(accountID uint, cookiePath string) *PooledContext {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	for _, ctx := range b.contexts {
+		if ctx.accountID == accountID && ctx.cookiePath == cookiePath {
+			// 不检查时间间隔，立即复用
+			ctx.lastUsed = time.Now()
+			b.inUse++
+			return ctx
+		}
+	}
+	return nil
+}
+
+// createContext 创建浏览器上下文（兼容旧版）
 func (b *PooledBrowser) createContext(cookiePath string, options *ContextOptions) (*PooledContext, error) {
+	return b.createContextWithAccount(0, cookiePath, options)
+}
+
+// createContextWithAccount 创建带accountID的浏览器上下文
+func (b *PooledBrowser) createContextWithAccount(accountID uint, cookiePath string, options *ContextOptions) (*PooledContext, error) {
+	return b.createContextWithPlatform(accountID, "", cookiePath, options)
+}
+
+// createContextWithPlatform 创建带platform和accountID的浏览器上下文
+func (b *PooledBrowser) createContextWithPlatform(accountID uint, platform string, cookiePath string, options *ContextOptions) (*PooledContext, error) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
@@ -368,6 +821,8 @@ func (b *PooledBrowser) createContext(cookiePath string, options *ContextOptions
 	ctx := &PooledContext{
 		context:    context,
 		cookiePath: cookiePath,
+		accountID:  accountID,
+		platform:   platform,
 		createdAt:  time.Now(),
 		lastUsed:   time.Now(),
 		parent:     b,
@@ -375,6 +830,11 @@ func (b *PooledBrowser) createContext(cookiePath string, options *ContextOptions
 
 	b.contexts = append(b.contexts, ctx)
 	b.inUse++
+
+	// 增加平台计数（用于亲和性调度）
+	if platform != "" {
+		b.incrementPlatformCount(platform)
+	}
 
 	return ctx, nil
 }
@@ -452,6 +912,10 @@ func (c *PooledContext) removeFromParent() {
 		if ctx == c {
 			// 从切片中移除
 			c.parent.contexts = append(c.parent.contexts[:i], c.parent.contexts[i+1:]...)
+			// 减少平台计数
+			if c.platform != "" {
+				c.parent.decrementPlatformCount(c.platform)
+			}
 			break
 		}
 	}
@@ -491,6 +955,16 @@ func (c *PooledContext) SaveCookiesTo(cookiePath string) error {
 	}
 
 	return os.WriteFile(cookiePath, data, 0644)
+}
+
+// GetAccountID 获取上下文绑定的账号ID
+func (c *PooledContext) GetAccountID() uint {
+	return c.accountID
+}
+
+// GetPlatform 获取上下文绑定的平台
+func (c *PooledContext) GetPlatform() string {
+	return c.platform
 }
 
 // GetPage 获取或创建页面
@@ -579,6 +1053,77 @@ func (c *PooledContext) checkPageAlive() bool {
 	}
 
 	return true
+}
+
+// ==================== 异常恢复方法 ====================
+
+// RecoverPage 恢复页面（页面意外关闭时重建）
+func (c *PooledContext) RecoverPage() error {
+	utils.Info(fmt.Sprintf("[-] [%s] 尝试恢复页面...", c.platform))
+
+	// 1. 检查上下文是否仍然有效
+	if c.context == nil {
+		return fmt.Errorf("浏览器上下文已失效，无法恢复")
+	}
+
+	// 2. 关闭旧页面（如果存在）
+	if c.page != nil {
+		c.page.Close()
+		c.page = nil
+	}
+
+	// 3. 创建新页面
+	page, err := c.context.NewPage()
+	if err != nil {
+		return fmt.Errorf("创建新页面失败: %w", err)
+	}
+
+	// 4. 设置默认超时
+	page.SetDefaultTimeout(30000)
+	page.SetDefaultNavigationTimeout(30000)
+
+	// 5. 监听页面关闭事件
+	page.On("close", func() {
+		utils.Info(fmt.Sprintf("[-] [%s] 浏览器页面被关闭", c.platform))
+		c.page = nil
+	})
+
+	c.page = page
+	utils.Info(fmt.Sprintf("[-] [%s] 页面恢复成功", c.platform))
+	return nil
+}
+
+// IsHealthy 检查上下文整体健康状态
+func (c *PooledContext) IsHealthy() bool {
+	// 1. 检查上下文是否存在
+	if c.context == nil {
+		return false
+	}
+
+	// 2. 检查页面状态
+	if c.IsPageClosed() {
+		return false
+	}
+
+	// 3. 尝试执行简单JS验证响应
+	if !c.checkPageAlive() {
+		return false
+	}
+
+	return true
+}
+
+// GetRecoveryInfo 获取恢复信息（用于日志和监控）
+func (c *PooledContext) GetRecoveryInfo() map[string]interface{} {
+	return map[string]interface{}{
+		"accountID":    c.accountID,
+		"platform":     c.platform,
+		"cookiePath":   c.cookiePath,
+		"createdAt":    c.createdAt,
+		"lastUsed":     c.lastUsed,
+		"isHealthy":    c.IsHealthy(),
+		"isPageClosed": c.IsPageClosed(),
+	}
 }
 
 // Close 关闭上下文（强制关闭）

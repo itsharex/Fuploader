@@ -44,3 +44,13 @@ type CoverInfo struct {
 type StepResultData struct {
 	Type string `json:"type"`
 }
+
+// BrowserPoolConfig 浏览器池配置
+type BrowserPoolConfig struct {
+	MaxBrowsers           int    `json:"maxBrowsers"`
+	MaxContextsPerBrowser int    `json:"maxContextsPerBrowser"`
+	ContextIdleTimeout    int    `json:"contextIdleTimeout"`
+	EnableHealthCheck     bool   `json:"enableHealthCheck"`
+	HealthCheckInterval   int    `json:"healthCheckInterval"`
+	ContextReuseMode      string `json:"contextReuseMode"`
+}

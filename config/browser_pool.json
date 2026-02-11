@@ -1,0 +1,8 @@
+{
+  "max_browsers": 2,
+  "max_contexts_per_browser": 5,
+  "context_idle_timeout": 30,
+  "enable_health_check": true,
+  "health_check_interval": 60,
+  "context_reuse_mode": "conservative"
+}
